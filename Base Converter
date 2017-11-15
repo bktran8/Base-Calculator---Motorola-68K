@@ -1,0 +1,183 @@
+*----------------------------------------------------------------------
+* Programmer: Brenda Tran	
+* Class Account: cssc0253
+* Assignment or Title: Program 3
+* Filename: prog3.s
+* Date completed: 4/29/17
+*----------------------------------------------------------------------
+* Problem statement: Convert number to destination base
+* Input: Source Base, Number to convert, Destination Base
+* Output: Number in destination in base
+* Error conditions tested: Valid ranges of input
+* Included files: none  
+* Method and/or pseudocode: none
+* References: none
+*----------------------------------------------------------------------
+        ORG     $0
+        DC.L    $3000           * Stack pointer value after a reset
+        DC.L    start           * Program counter value after a reset
+        ORG     $3000           * Start at location 3000 Hex
+*----------------------------------------------------------------------
+#minclude /home/cs/faculty/riggins/bsvc/macros/iomacs.s
+#minclude /home/cs/faculty/riggins/bsvc/macros/evtmacs.s
+*----------------------------------------------------------------------
+* Register use
+*----------------------------------------------------------------------
+start:  initIO                  * Initialize (required for I/O)
+	setEVT			* Error handling routines
+*	initF			* For floating point macros only	
+
+        		lineout     	title
+    
+Sbase:  	    lineout     	p1          	*output Enter the base..
+       	 	    linein      	buffer      	*user input
+      	  	    cvta2       	buffer,D0   	*D0 - Sbase in twos
+        		cmp.w       	#2,D0       	*compare 2 to Sbase
+       		    blo         	error1      	*branch to error if lower
+        		cmp.w      	#16,D0      	*compare 16 to Sbase
+        		bhi         	error2      	*branch to error if higher
+        		move.l      	D0,D7       	*D7 - Source Base
+        		bra         	Numb        	*branch to Numb  
+error1: 	    lineout     	errorA      	*lineout The Source Base is lower than valid range
+        		bra         	Sbase       	*branch to Sbase
+error2: 	    lineout     	errorB      	*lineout The Source Base is greater than valid range
+        		bra         	Sbase       	*branch to Sbase
+        
+        
+Numb:   	    lineout     	p2          	*lineout Enter the number to convert
+        		linein      	buffer      	*linein buffer
+        		lea         	buffer,A3   	*load address of buffer A1
+        		move.w      	D0,D4      	 *D4 - length of number
+        		move.w      	D4,D5      	 *D5 - length number
+        		subq        	#1,D5       	*D5- length of number N-1
+Nrange: 	    cmpi.b      	#$30,(A3)   	*compare Number to 0
+        		blo         	error3     	 *branch to error if less
+        		cmpi.b      	#$39,(A3)   	*compare Number to 9
+        		bhi         	Nhex        	*branch to Nhex is it is higher than 9
+       		    subi.b     	 #'30',(A3)  	*subtract 30 to number
+        		cmp.b       	(A3)+,D7    	*compare to source base
+        		blo         	error9      	*branch error if lower
+Nback:  	    dbra        	D5,Nrange   	*continuously branch through Nrange until DO is -1
+        		bra        	Dbase
+        
+Nhex:   	    ori.b       	#$20,buffer
+        		cmpi.b      	#$61,(A3)   	*compare number to a
+        		blo         	error4      	*branch to error 
+        		cmpi.b      	#$66,(A3)   	*compare number to f
+       		    bhi         	error5      	*branch to error is higher
+       		    subi.b      	#'57',(A3)  	*subtract 57 to get number
+        		cmp.b       	(A3)+,D7    	*compare source base to number
+        		blo         	error10     	*if lower branch to error
+        		bra         	Nback       	*branch back to Nback  
+
+error3: 	    lineout     	errorC  
+        		bra         	Numb  
+error4: 	    lineout     	errorD
+        		bra         	Numb 
+error5: 	    lineout     	errorE
+        		bra         	Numb   
+error6: 	    lineout     	errorF
+        		bra         	Numb
+error9: 	    lineout     	errorK
+        		bra         	Numb
+error10:	    lineout     	errorL
+        		bra         	Numb
+
+Dbase:  	    lineout     	p3          	*lineout Enter the base to convert to:
+       	 	    linein      	buffer      	*linein buffer
+        		cvta2       	buffer,D0   	*D0 - Dbase in twos
+        		cmp.w       	#2,D0       	*compare dbase to 2
+        		blo         	error7      	*branch to error if lower
+        		cmp.w       	#16,D0      	*compare dbase to 16
+        		bhi         	error8      	*branch to error is higher
+        		move.w      	D0,D5       	*D5 - Destination Base
+        		bra         	Conv     
+error7: 	    lineout     	errorG
+        		bra         	Dbase
+error8: 	    lineout     	errorH
+        		bra         	Dbase
+        
+  *D7 Sbase,  D4 size, D3 number, D2 tmpbase
+  
+Conv:  		    clr.l         	D3          	*number = 0
+        		clr.l         	D1          	*counter = 0
+        		moveq       	#1,D2       	*D2 - 1 tmpbase
+        		adda.l      	D4,A1       	*pointer at the end 
+        		subq.w      	#1,D4       	*D4 - size - 1 
+Cmul:   	    move.b      	-(A3),D6   	 *move first byte from right to D6
+        		mulu        	D2,D6       	*multiply tmpbase by byte
+        		add.w       	D6,D3       	*add product to number
+        		mulu        	D7,D2       	*multiply tmpbase by base
+        		addq.w      	#1,D1
+        		dbra        	D4,Cmul     	*branch back to cmul
+        		bra         	Cdiv        	*answer in D3
+        
+Cdiv:   		andi.l      	#$0000FFFF,D3   *clear first 4 of number
+        		divu        	D5,D3          	 *divide Dbase by decimal number
+        		swap        	D3              	*swap q and r
+        		move.b      	D3,(A3)+        	*move answer into A1, increment
+        		swap        	D3              	*swap
+        		tst.w       	D3              	*tst for zero
+        		bne         	Cdiv            	*not equal branch back to cdiv 
+        
+        		lea         	number,A6      	*load storage address of number into A6
+        		subq.w      	#1,D1           	*Subtract 1 from counter for dbra
+End1:   		move.b      	-(A3),(A6)     	*move first byte of number from left into A6
+        		cmpi.b      	#$9,(A6)        	*compare to 9
+        		bhi         	Sum             	*if higher branch to sum
+        		addi.b      	#$30,(A6)+      	*add 30 increment pointer
+End2:   		dbra        	D1,End1         	*branch back to End1 until counter = -1
+        		clr.b       	(A6)            	*null terminate
+        		bra         	End3            	*branch to End3
+Sum:   		    addi.b      	#$37,(A6)+      *add 37, increment A6 pointer
+        		bra         	End2           	 *branch back to End2
+
+
+End3:   		lineout     	p4              	*lineout answer
+        		bra         	Again           	*branch to y/n loop
+
+        *Y/N loop
+Again: 		    lineout     	p5              	*output prompt
+        		linein      	buffer          	*user input
+        		ori.b       	#$20,buffer     *case sensitivity
+        		cmpi.b       	#'y',buffer     	*compare input to y 
+        		beq         	Sbase           	*if equal branch to Sbase
+        		cmpi.b       	#'n',buffer     	*compare input to n 
+        		beq         	Done1           	*if equal branch to Done1
+        
+Done1:  	    lineout    	done            *output, nulll terminate program
+
+
+        break                   * Terminate execution
+
+
+
+
+
+*----------------------------------------------------------------------
+*       Storage declarations
+title:  		dc.b    'Program 3, Brenda Tran, cssc0253',0
+p1:     		dc.b    'Enter the base of the number to convert (2..16):',0
+p2:     		dc.b    'Enter the number to convert:',0
+p3:     		dc.b    'Enter the base to convert to:',0 
+p5:     		dc.b    'Do you want to convert another number (Y/N)?',0
+done:   	dc.b    'The program has finished.',0
+errorA: 	dc.b    'The Source Base is lower than valid range',0   
+errorB: 	dc.b    'The Source Base is greater than valid range',0 
+errorC: 	dc.b    'The Number is less than valid range',0 
+errorD: 	dc.b    'The Number is less than range in hex',0 
+errorE: 	dc.b    'The Number is greater than range in hex',0 
+errorF: 	dc.b    'The Number does not correspond to the Source Base',0
+errorG:		dc.b    'The Destination Base is lower than valid range',0 
+errorH:		dc.b    'The Destination Base is greater than valid range',0 
+errorI: 		dc.b    'The Number exceeds capacity',0
+errorJ: 		dc.b    'The input is not a number',0
+errorK: 	dc.b    'The Number does not correspond to Source Base',0
+errorL: 		dc.b    'The Hex number does not correspond Source Base',0 
+buffer: 	ds.b    82 
+p4:     		dc.b    'The number is '   
+number: 	ds.b    30
+
+*
+
+        end
